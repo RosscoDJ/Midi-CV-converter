@@ -53,11 +53,15 @@
 
 #include <Adafruit_MCP4725.h>
 #include <MIDI.h>
+#include <Adafruit_SSD1306.h>
+#include <Adafruit_GFX.h>
 
 //set at your will ...
 
 #define REVERSE_GATE 0 //V-Trig = 0, S-Trig = 1
 #define CC_NUMBER 1 //MIDI CC number
+#define OLED_RESET 4
+Adafruit_SSD1306 display(OLED_RESET);
 bool HZV = 0; //set to "0" for V/oct
 
 Adafruit_MCP4725 dac;
@@ -78,20 +82,12 @@ enum PinAssignments {
   encoderPinA = 2,   // right (labeled DT on our decoder, yellow wire)
   encoderPinB = 3,   // left (labeled CLK on our decoder, green wire)
   clearButton = 5,   // switch (labeled SW on our decoder, orange wire)
-  ledPin = 6         // Led for save state, active Low.
 // connect the +5v and gnd appropriately
 };
 
 volatile unsigned int encoderPos;  // a counter for the dial
 unsigned int lastReportedPos = 1;   // change management
 static boolean rotating=false;      // debounce management
-
-
-//shift register pins
-const int dataPin = 11;  // to 74HC595 pin 14
-const int latchPin = 8; //  to 74HC595 pin 12
-const int clockPin = 12; // to 74HC595 pin 11
-const char common = 'c';    // common cathode
 
 // interrupt service routine vars
 boolean A_set = false;              
@@ -117,15 +113,12 @@ MIDI.setHandleControlChange(handleControlChange);
 MIDI.begin(MIDI_CHANNEL);// start MIDI and listen to channel "MIDI_CHANNEL"
 dac.begin(0x62);
 
+display.begin(SSD1306_SWITCHCAPVCC, 0x3C);  // initialize with the I2C addr 0x3C (for the 128x32)
+
 //midi chan select
   pinMode(encoderPinA, INPUT_PULLUP); // new method of enabling pullups
   pinMode(encoderPinB, INPUT_PULLUP); 
   pinMode(clearButton, INPUT_PULLUP);
-  pinMode(ledPin, OUTPUT);
-// initialize shift register pins
-  pinMode(dataPin, OUTPUT);
-  pinMode(latchPin, OUTPUT);
-  pinMode(clockPin, OUTPUT);
 
 // encoder pin on interrupt 0 (pin 2)
   attachInterrupt(0, doEncoderA, CHANGE);
@@ -134,7 +127,10 @@ dac.begin(0x62);
 
   encoderPos = 1; 
   MIDI_CHANNEL = encoderPos;
-  digitalWrite(ledPin, LOW);
+
+  display.setTextSize(2);
+  display.setTextColor(WHITE);
+  displayOled(MIDI_CHANNEL, true);
 }
 
 void loop() {
@@ -142,15 +138,14 @@ MIDI.read(MIDI_CHANNEL);
 
 // midi chan select
   rotating = true;  // reset the debouncer
-  byte bitsLO = myfnNumToBitsLO(encoderPos) ;
-  byte bitsHI = myfnNumToBitsHI(encoderPos) ;
-  myfnUpdateDisplay(bitsLO, bitsHI);    // display alphanumeric digit
+  
   if (lastReportedPos != encoderPos) {
+    displayOled(encoderPos, false);
     lastReportedPos = encoderPos;
   }
   if (digitalRead(clearButton) == HIGH )  {
     MIDI_CHANNEL = encoderPos;
-    digitalWrite(ledPin, LOW);
+    displayOled(MIDI_CHANNEL, true);
   }
 }
 
@@ -196,7 +191,7 @@ void doEncoderA(){
     if ( A_set && !B_set ) 
       encoderPos += 1;
       encoderPos = min(encoderPos, 16);
-      digitalWrite(ledPin, HIGH);
+      
     rotating = false;  // no more debouncing until loop() hits again
   }
 }
@@ -210,129 +205,26 @@ void doEncoderB(){
     if( B_set && !A_set ) 
       encoderPos -= 1;
       encoderPos = max(encoderPos, 1);
-      digitalWrite(ledPin, HIGH);
 
     rotating = false;
   }
 }
 
-void myfnUpdateDisplay(byte eightBitsLO, byte eightBitsHI) {
-  digitalWrite(latchPin, LOW);  // prepare shift register for data
-  shiftOut(dataPin, clockPin, LSBFIRST, eightBitsLO); // send data
-  shiftOut(dataPin, clockPin, LSBFIRST, eightBitsHI); // send data
-  digitalWrite(latchPin, HIGH); // update display
-}
 
-byte myfnNumToBitsLO(int encoderPos) {
-  switch (encoderPos) {
-    case 1:
-      return B01100000;
-      break;
-    case 2:
-      return B11011010;
-      break;
-    case 3:
-      return B11110010;
-      break;
-    case 4:
-      return B01100110;
-      break;
-    case 5:
-      return B10110110;
-      break;
-    case 6:
-      return B10111110;
-      break;
-    case 7:
-      return B11100000;
-      break;
-    case 8:
-      return B11111110;
-      break;
-    case 9:
-      return B11110110;
-      break;
-    case 10:
-      return B11111100; // decimal 0
-      break;
-    case 11:
-      return B01100000; // decimal 1
-      break;
-    case 12:
-      return B11011010; // decimal 2
-      break;
-    case 13:
-      return B11110010; // decimal 3
-      break;
-    case 14:
-      return B01100110; // decimal 4
-      break;
-    case 15:
-      return B10110110; // decimal 5
-      break;  
-    case 16:
-      return B10111110;
-      break;
-    default:
-      return B10010010; // Error condition, displays three vertical bars
-      break;   
-  }
+void displayOled(int data, bool saved){
+    display.setCursor(1,0);
+    display.clearDisplay();
+    display.println("Midi Chan:");
+    display.setCursor(1,18);
+    String padZero = "";
+    String callToAction = "";
+    if (saved == false){
+      callToAction = "  save?";
+    }
+    if (data < 10){
+      padZero = "0";
+    }
+    display.println(padZero + String(data) + callToAction);
+    display.display();
 }
-
-byte myfnNumToBitsHI(int encoderPos) {
-  switch (encoderPos) {
-    case 1:
-      return B11111100;
-      break;
-    case 2:
-      return B11111100;
-      break;
-    case 3:
-      return B11111100;
-      break;
-    case 4:
-      return B11111100;
-      break;
-    case 5:
-      return B11111100;
-      break;
-    case 6:
-      return B11111100;
-      break;
-    case 7:
-      return B11111100;
-      break;
-    case 8:
-      return B11111100;
-      break;
-    case 9:
-      return B11111100;
-      break;
-    case 10:
-      return B01100000; // decimal 1
-      break;
-    case 11:
-      return B01100000; 
-      break;
-    case 12:
-      return B01100000; 
-      break;
-    case 13:
-      return B01100000; 
-      break;
-    case 14:
-      return B01100000; 
-      break;
-    case 15:
-      return B01100000; 
-      break;  
-    case 16:
-      return B01100000;
-      break;
-    default:
-      return B10010010; // Error condition, displays three vertical bars
-      break;   
-  }
-}
-
 
