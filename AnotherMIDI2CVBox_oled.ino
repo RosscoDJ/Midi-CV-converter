@@ -140,8 +140,11 @@ MIDI.read(MIDI_CHANNEL);
   rotating = true;  // reset the debouncer
   
   if (lastReportedPos != encoderPos) {
-    displayOled(encoderPos, false);
+    displayOled(encoderPos, false); 
     lastReportedPos = encoderPos;
+    if (displayOled(encoderPos, false) != encoderPos){
+      displayOled(encoderPos, false); 
+    }
   }
   if (digitalRead(clearButton) == HIGH )  {
     MIDI_CHANNEL = encoderPos;
@@ -181,7 +184,7 @@ void handleControlChange(byte channel, byte number, byte value){
 // Interrupt on A changing state
 void doEncoderA(){
   // debounce
-  if ( rotating ) delay (1);  // wait a little until the bouncing is done
+  if ( rotating ) delay (5);  // wait a little until the bouncing is done
 
   // Test transition, did things really change? 
   if( digitalRead(encoderPinA) != A_set ) {  // debounce once more
@@ -198,7 +201,7 @@ void doEncoderA(){
 
 // Interrupt on B changing state, same as A above
 void doEncoderB(){
-  if ( rotating ) delay (1);
+  if ( rotating ) delay (5);
   if( digitalRead(encoderPinB) != B_set ) {
     B_set = !B_set;
     //  adjust counter - 1 if B leads A
@@ -211,7 +214,7 @@ void doEncoderB(){
 }
 
 
-void displayOled(int data, bool saved){
+int displayOled(int data, bool saved){
     display.setCursor(1,0);
     display.clearDisplay();
     display.println("Midi Chan:");
@@ -226,5 +229,6 @@ void displayOled(int data, bool saved){
     }
     display.println(padZero + String(data) + callToAction);
     display.display();
+    return data;
 }
 
