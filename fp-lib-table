@@ -1,0 +1,5 @@
+(fp_lib_table
+  (lib (name MCP4725A0T-E_CH)(type Legacy)(uri /Users/rossredman/Downloads/MCP4725A0T-E_CH/MCP4725A0T-E_CH.mod)(options "")(descr ""))
+  (lib (name 6N138)(type Legacy)(uri /Users/rossredman/Downloads/6N138/6N138.mod)(options "")(descr ""))
+  (lib (name ATMEGA328-PU)(type Legacy)(uri /Users/rossredman/Downloads/ATMEGA328-PU-2/ATMEGA328-PU.mod)(options "")(descr ""))
+)
